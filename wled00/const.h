@@ -192,6 +192,9 @@
 #define SEG_OPTION_FREEZE         5            //Segment contents will not be refreshed
 #define SEG_OPTION_TRANSITIONAL   7
 
+//Playlist option byte
+#define PL_OPTION_SHUFFLE      0x01
+
 // WLED Error modes
 #define ERR_NONE         0  // All good :)
 #define ERR_EEP_COMMIT   2  // Could not commit to EEPROM (wrong flash layout?)
@@ -237,7 +240,11 @@
 // string temp buffer (now stored in stack locally)
 #define OMAX 2048
 
-#define E131_MAX_UNIVERSE_COUNT 9
+#ifdef WLED_USE_ETHERNET
+#define E131_MAX_UNIVERSE_COUNT 20
+#else
+#define E131_MAX_UNIVERSE_COUNT 10
+#endif
 
 #define ABL_MILLIAMPS_DEFAULT 850  // auto lower brightness to stay close to milliampere limit
 
