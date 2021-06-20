@@ -328,26 +328,28 @@ void serializeSegment(JsonObject& root, WS2812FX::Segment& seg, byte id, bool fo
   byte segbri = seg.opacity;
   root["bri"] = (segbri) ? segbri : 255;
 
-	JsonArray colarr = root.createNestedArray("col");
+  char colstr[70]; colstr[0] = '['; colstr[1] = '\0'; //max len 68 (5 chan, all 255)
 
 	for (uint8_t i = 0; i < 3; i++)
 	{
-		JsonArray colX = colarr.createNestedArray();
+    byte segcol[4]; byte* c = segcol;
+
     if (id == strip.getMainSegmentId() && i < 2) //temporary, to make transition work on main segment
     {
-      if (i == 0) {
-        colX.add(col[0]); colX.add(col[1]); colX.add(col[2]); if (strip.isRgbw) colX.add(col[3]);
-      } else {
-         colX.add(colSec[0]); colX.add(colSec[1]); colX.add(colSec[2]); if (strip.isRgbw) colX.add(colSec[3]);
-      }
+      c = (i == 0)? col:colSec;
     } else {
-  		colX.add((seg.colors[i] >> 16) & 0xFF);
-  		colX.add((seg.colors[i] >> 8) & 0xFF);
-  		colX.add((seg.colors[i]) & 0xFF);
-  		if (strip.isRgbw)
-  			colX.add((seg.colors[i] >> 24) & 0xFF);
+      segcol[0] = (byte)(seg.colors[i] >> 16); segcol[1] = (byte)(seg.colors[i] >> 8);
+      segcol[2] = (byte)(seg.colors[i]);       segcol[3] = (byte)(seg.colors[i] >> 24);
     }
+
+    char tmpcol[22];
+    if (strip.isRgbw) sprintf_P(tmpcol, PSTR("[%u,%u,%u,%u]"), c[0], c[1], c[2], c[3]);
+    else              sprintf_P(tmpcol, PSTR("[%u,%u,%u]"),   c[0], c[1], c[2]);
+
+    strcat(colstr, i<2 ? strcat(tmpcol,",") : tmpcol);
 	}
+  strcat(colstr,"]");
+  root["col"] = serialized(colstr);
 
 	root[F("fx")]  = seg.mode;
 	root[F("sx")]  = seg.speed;
@@ -789,6 +791,9 @@ void serveJson(AsyncWebServerRequest* request)
         doc[F("palettes")] = serialized((const __FlashStringHelper*)JSON_palette_names);
       }
   }
+
+  DEBUG_PRINT("JSON buffer size: ");
+  DEBUG_PRINTLN(doc.memoryUsage());
 
   response->setLength();
   request->send(response);
