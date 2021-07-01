@@ -23,7 +23,7 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
   getStringFromJson(serverDescription, id[F("name")], 33);
   getStringFromJson(alexaInvocationName, id[F("inv")], 33);
 
-  JsonObject nw_ins_0 = doc["nw"][F("ins")][0];
+  JsonObject nw_ins_0 = doc["nw"]["ins"][0];
   getStringFromJson(clientSSID, nw_ins_0[F("ssid")], 33);
   //int nw_ins_0_pskl = nw_ins_0[F("pskl")];
   //The WiFi PSK is normally not contained in the regular file for security reasons.
@@ -124,21 +124,20 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
   if (hw_led["rev"]) busses.getBus(0)->reversed = true; //set 0.11 global reversed setting for first bus
 
   // read multiple button configuration
-  JsonArray hw_btn_ins = hw[F("btn")][F("ins")];
+  JsonObject btn_obj = hw["btn"];
+  JsonArray hw_btn_ins = btn_obj[F("ins")];
   if (!hw_btn_ins.isNull()) {
     uint8_t s = 0;
     for (JsonObject btn : hw_btn_ins) {
       CJSON(buttonType[s], btn["type"]);
-      int8_t pin = btn[F("pin")][0] | -1;
-      if (pin > -1) {
-        if (pinManager.allocatePin(pin,false)) {
-          btnPin[s] = pin;
-          pinMode(btnPin[s], INPUT_PULLUP);
-        } else {
-          btnPin[s] = -1;
-        }
+      int8_t pin = btn["pin"][0] | -1;
+      if (pin > -1 && pinManager.allocatePin(pin,false)) {
+        btnPin[s] = pin;
+        pinMode(btnPin[s], INPUT_PULLUP);
+      } else {
+        btnPin[s] = -1;
       }
-      JsonArray hw_btn_ins_0_macros = btn[F("macros")];
+      JsonArray hw_btn_ins_0_macros = btn["macros"];
       CJSON(macroButton[s], hw_btn_ins_0_macros[0]);
       CJSON(macroLongPress[s],hw_btn_ins_0_macros[1]);
       CJSON(macroDoublePress[s], hw_btn_ins_0_macros[2]);
@@ -163,7 +162,8 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
         macroDoublePress[s] = 0;
       }
   }
-  CJSON(touchThreshold,hw[F("btn")][F("tt")]);
+  CJSON(touchThreshold,btn_obj[F("tt")]);
+  CJSON(buttonPublishMqtt,btn_obj["mqtt"]);
 
   int hw_ir_pin = hw["ir"]["pin"] | -2; // 4
   if (hw_ir_pin > -2) {
@@ -195,8 +195,8 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
   CJSON(briMultiplier, light[F("scale-bri")]);
   CJSON(strip.paletteBlend, light[F("pal-mode")]);
 
-  float light_gc_bri = light[F("gc")]["bri"];
-  float light_gc_col = light[F("gc")]["col"]; // 2.8
+  float light_gc_bri = light["gc"]["bri"];
+  float light_gc_col = light["gc"]["col"]; // 2.8
   if (light_gc_bri > 1.5) strip.gammaCorrectBri = true;
   else if (light_gc_bri > 0.5) strip.gammaCorrectBri = false;
   if (light_gc_col > 1.5) strip.gammaCorrectCol = true;
@@ -215,21 +215,12 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
   if (nightlightDelayMinsDefault != prev) nightlightDelayMins = nightlightDelayMinsDefault;
 
   CJSON(nightlightTargetBri, light_nl[F("tbri")]);
-  CJSON(macroNl, light_nl[F("macro")]);
+  CJSON(macroNl, light_nl["macro"]);
 
   JsonObject def = doc[F("def")];
   CJSON(bootPreset, def[F("ps")]);
   CJSON(turnOnAtBoot, def["on"]); // true
   CJSON(briS, def["bri"]); // 128
-
-  JsonObject def_cy = def[F("cy")];
-  CJSON(presetCyclingEnabled, def_cy["on"]);
-
-  CJSON(presetCycleMin, def_cy[F("range")][0]);
-  CJSON(presetCycleMax, def_cy[F("range")][1]);
-
-  tdd = def_cy["dur"] | -1;
-  if (tdd > 0) presetCycleTime = tdd;
 
   JsonObject interfaces = doc["if"];
 
@@ -248,10 +239,10 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
   prev = notifyDirectDefault;
   CJSON(notifyDirectDefault, if_sync_send[F("dir")]);
   if (notifyDirectDefault != prev) notifyDirect = notifyDirectDefault;
-  CJSON(notifyButton, if_sync_send[F("btn")]);
-  CJSON(notifyAlexa, if_sync_send[F("va")]);
-  CJSON(notifyHue, if_sync_send[F("hue")]);
-  CJSON(notifyMacro, if_sync_send[F("macro")]);
+  CJSON(notifyButton, if_sync_send["btn"]);
+  CJSON(notifyAlexa, if_sync_send["va"]);
+  CJSON(notifyHue, if_sync_send["hue"]);
+  CJSON(notifyMacro, if_sync_send["macro"]);
   CJSON(notifyTwice, if_sync_send[F("twice")]);
 
   JsonObject if_nodes = interfaces["nodes"];
@@ -275,10 +266,10 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
   CJSON(arlsDisableGammaCorrection, if_live[F("no-gc")]); // false
   CJSON(arlsOffset, if_live[F("offset")]); // 0
 
-  CJSON(alexaEnabled, interfaces[F("va")][F("alexa")]); // false
+  CJSON(alexaEnabled, interfaces["va"][F("alexa")]); // false
 
-  CJSON(macroAlexaOn, interfaces[F("va")][F("macros")][0]);
-  CJSON(macroAlexaOff, interfaces[F("va")][F("macros")][1]);
+  CJSON(macroAlexaOn, interfaces["va"]["macros"][0]);
+  CJSON(macroAlexaOff, interfaces["va"]["macros"][1]);
 
 #ifndef WLED_DISABLE_BLYNK
   const char* apikey = interfaces["blynk"][F("token")] | "Hidden";
@@ -297,7 +288,7 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
   getStringFromJson(mqttServer, if_mqtt[F("broker")], 33);
   CJSON(mqttPort, if_mqtt["port"]); // 1883
   getStringFromJson(mqttUser, if_mqtt[F("user")], 41);
-  getStringFromJson(mqttPass, if_mqtt["psk"], 41); //normally not present due to security
+  getStringFromJson(mqttPass, if_mqtt["psk"], 65); //normally not present due to security
   getStringFromJson(mqttClientID, if_mqtt[F("cid")], 41);
 
   getStringFromJson(mqttDeviceTopic, if_mqtt[F("topics")][F("device")], 33); // "wled/test"
@@ -305,7 +296,7 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
 #endif
 
 #ifndef WLED_DISABLE_HUESYNC
-  JsonObject if_hue = interfaces[F("hue")];
+  JsonObject if_hue = interfaces["hue"];
   CJSON(huePollingEnabled, if_hue["en"]);
   CJSON(huePollLightId, if_hue["id"]);
   tdd = if_hue[F("iv")] | -1;
@@ -353,17 +344,17 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
   CJSON(countdownHour,  cntdwn_goal[3]);
   CJSON(countdownMin,   cntdwn_goal[4]);
   CJSON(countdownSec,   cntdwn_goal[5]);
-  CJSON(macroCountdown, cntdwn[F("macro")]);
+  CJSON(macroCountdown, cntdwn["macro"]);
   setCountdown();
 
-  JsonArray timers = tm[F("ins")];
+  JsonArray timers = tm["ins"];
   uint8_t it = 0;
   for (JsonObject timer : timers) {
     if (it > 9) break;
     if (it<8 && timer[F("hour")]==255) it=8;  // hour==255 -> sunrise/sunset 
     CJSON(timerHours[it], timer[F("hour")]);
     CJSON(timerMinutes[it], timer["min"]);
-    CJSON(timerMacro[it], timer[F("macro")]);
+    CJSON(timerMacro[it], timer["macro"]);
 
     byte dowPrev =  timerWeekday[it];
     //note: act is currently only 0 or 1.
@@ -410,7 +401,10 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
 
   DEBUG_PRINTLN(F("Starting usermod config."));
   JsonObject usermods_settings = doc["um"];
-  if (!usermods_settings.isNull()) usermods.readFromConfig(usermods_settings);
+  if (!usermods_settings.isNull()) {
+    bool allComplete = usermods.readFromConfig(usermods_settings);
+    if (!allComplete && fromFS) serializeConfig();
+  }
 
   if (fromFS) return false;
   doReboot = doc[F("rb")] | doReboot;
@@ -418,11 +412,10 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
 }
 
 void deserializeConfigFromFS() {
-  bool fromeep = false;
   bool success = deserializeConfigSec();
   if (!success) { //if file does not exist, try reading from EEPROM
     deEEPSettings();
-    fromeep = true;
+    return;
   }
 
   DynamicJsonDocument doc(JSON_BUFFER_SIZE);
@@ -431,7 +424,7 @@ void deserializeConfigFromFS() {
 
   success = readObjectFromFile("/cfg.json", nullptr, &doc);
   if (!success) { //if file does not exist, try reading from EEPROM
-    if (!fromeep) deEEPSettings();
+    deEEPSettings();
     return;
   }
 
@@ -550,6 +543,7 @@ void serializeConfig() {
     hw_btn_ins_0_macros.add(macroDoublePress[i]);
   }
   hw_btn[F("tt")] = touchThreshold;
+  hw_btn["mqtt"] = buttonPublishMqtt;
 
   JsonObject hw_ir = hw.createNestedObject("ir");
   hw_ir["pin"] = irPin;
@@ -579,23 +573,12 @@ void serializeConfig() {
   light_nl[F("mode")] = nightlightMode;
   light_nl["dur"] = nightlightDelayMinsDefault;
   light_nl[F("tbri")] = nightlightTargetBri;
-  light_nl[F("macro")] = macroNl;
+  light_nl["macro"] = macroNl;
 
   JsonObject def = doc.createNestedObject("def");
   def[F("ps")] = bootPreset;
   def["on"] = turnOnAtBoot;
   def["bri"] = briS;
-
-  //to be removed once preset cycles are presets
-  if (saveCurrPresetCycConf) {
-    JsonObject def_cy = def.createNestedObject("cy");
-    def_cy["on"] = presetCyclingEnabled;
-
-    JsonArray def_cy_range = def_cy.createNestedArray(F("range"));
-    def_cy_range.add(presetCycleMin);
-    def_cy_range.add(presetCycleMax);
-    def_cy["dur"] = presetCycleTime;
-  }
 
   JsonObject interfaces = doc.createNestedObject("if");
 
@@ -610,10 +593,10 @@ void serializeConfig() {
 
   JsonObject if_sync_send = if_sync.createNestedObject("send");
   if_sync_send[F("dir")] = notifyDirect;
-  if_sync_send[F("btn")] = notifyButton;
-  if_sync_send[F("va")] = notifyAlexa;
-  if_sync_send[F("hue")] = notifyHue;
-  if_sync_send[F("macro")] = notifyMacro;
+  if_sync_send["btn"] = notifyButton;
+  if_sync_send["va"] = notifyAlexa;
+  if_sync_send["hue"] = notifyHue;
+  if_sync_send["macro"] = notifyMacro;
   if_sync_send[F("twice")] = notifyTwice;
 
   JsonObject if_nodes = interfaces.createNestedObject("nodes");
@@ -705,7 +688,7 @@ void serializeConfig() {
   JsonArray goal = cntdwn.createNestedArray(F("goal"));
   goal.add(countdownYear); goal.add(countdownMonth); goal.add(countdownDay);
   goal.add(countdownHour); goal.add(countdownMin); goal.add(countdownSec);
-  cntdwn[F("macro")] = macroCountdown;
+  cntdwn["macro"] = macroCountdown;
 
   JsonArray timers_ins = timers.createNestedArray("ins");
 
@@ -715,7 +698,7 @@ void serializeConfig() {
     timers_ins0["en"] = (timerWeekday[i] & 0x01);
     timers_ins0[F("hour")] = timerHours[i];
     timers_ins0["min"] = timerMinutes[i];
-    timers_ins0[F("macro")] = timerMacro[i];
+    timers_ins0["macro"] = timerMacro[i];
     timers_ins0[F("dow")] = timerWeekday[i] >> 1;
   }
 
@@ -754,7 +737,7 @@ bool deserializeConfigSec() {
   bool success = readObjectFromFile("/wsec.json", nullptr, &doc);
   if (!success) return false;
 
-  JsonObject nw_ins_0 = doc["nw"][F("ins")][0];
+  JsonObject nw_ins_0 = doc["nw"]["ins"][0];
   getStringFromJson(clientPass, nw_ins_0["psk"], 65);
 
   JsonObject ap = doc["ap"];
@@ -771,11 +754,11 @@ bool deserializeConfigSec() {
 
 #ifdef WLED_ENABLE_MQTT
   JsonObject if_mqtt = interfaces["mqtt"];
-  getStringFromJson(mqttPass, if_mqtt["psk"], 41);
+  getStringFromJson(mqttPass, if_mqtt["psk"], 65);
 #endif
 
 #ifndef WLED_DISABLE_HUESYNC
-  getStringFromJson(hueApiKey, interfaces[F("hue")][F("key")], 47);
+  getStringFromJson(hueApiKey, interfaces["hue"][F("key")], 47);
 #endif
 
   JsonObject ota = doc["ota"];
