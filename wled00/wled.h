@@ -8,7 +8,7 @@
  */
 
 // version code in format yymmddb (b = daily build)
-#define VERSION 2108250
+#define VERSION 2109100
 
 //uncomment this if you have a "my_config.h" file you'd like to use
 #define WLED_USE_MY_CONFIG
@@ -267,6 +267,11 @@ WLED_GLOBAL uint16_t ledCount _INIT(DEFAULT_LED_COUNT);   // overcurrent prevent
 WLED_GLOBAL bool turnOnAtBoot _INIT(true);                // turn on LEDs at power-up
 WLED_GLOBAL byte bootPreset   _INIT(0);                   // save preset to load after power-up
 
+//if true, a segment per bus will be created on boot and LED settings save
+//if false, only one segment spanning the total LEDs is created,
+//but not on LED settings save if there is more than one segment currently
+WLED_GLOBAL bool autoSegments _INIT(false);
+
 WLED_GLOBAL byte col[]    _INIT_N(({ 255, 160, 0, 0 }));  // current RGB(W) primary color. col[] should be updated if you want to change the color.
 WLED_GLOBAL byte colSec[] _INIT_N(({ 0, 0, 0, 0 }));      // current RGB(W) secondary color
 WLED_GLOBAL byte briS     _INIT(128);                     // default brightness
@@ -294,9 +299,6 @@ WLED_GLOBAL byte irEnabled      _INIT(0);     // Infrared receiver
 WLED_GLOBAL uint16_t udpPort    _INIT(21324); // WLED notifier default port
 WLED_GLOBAL uint16_t udpPort2   _INIT(65506); // WLED notifier supplemental port
 WLED_GLOBAL uint16_t udpRgbPort _INIT(19446); // Hyperion port
-WLED_GLOBAL bool liveHSVCorrection _INIT(false);
-WLED_GLOBAL uint16_t liveHSVSaturation _INIT(13);
-WLED_GLOBAL uint16_t liveHSVValue _INIT(10);
 
 WLED_GLOBAL uint8_t syncGroups    _INIT(0x01);                    // sync groups this instance syncs (bit mapped)
 WLED_GLOBAL uint8_t receiveGroups _INIT(0x01);                    // sync receive groups this instance belongs to (bit mapped)

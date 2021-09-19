@@ -202,6 +202,7 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
   JsonObject light = doc[F("light")];
   CJSON(briMultiplier, light[F("scale-bri")]);
   CJSON(strip.paletteBlend, light[F("pal-mode")]);
+  CJSON(autoSegments, light[F("aseg")]);
 
   float light_gc_bri = light["gc"]["bri"];
   float light_gc_col = light["gc"]["col"]; // 2.8
@@ -275,10 +276,6 @@ bool deserializeConfig(JsonObject doc, bool fromFS) {
   CJSON(arlsForceMaxBri, if_live[F("maxbri")]);
   CJSON(arlsDisableGammaCorrection, if_live[F("no-gc")]); // false
   CJSON(arlsOffset, if_live[F("offset")]); // 0
-
-  CJSON(liveHSVCorrection, if_live[F("corr")]);
-  CJSON(liveHSVSaturation, if_live[F("hsvsat")]);
-  CJSON(liveHSVValue, if_live[F("hsvval")]);
 
   CJSON(alexaEnabled, interfaces["va"][F("alexa")]); // false
 
@@ -565,6 +562,7 @@ void serializeConfig() {
   JsonObject light = doc.createNestedObject(F("light"));
   light[F("scale-bri")] = briMultiplier;
   light[F("pal-mode")] = strip.paletteBlend;
+  light[F("aseg")] = autoSegments;
 
   JsonObject light_gc = light.createNestedObject("gc");
   light_gc["bri"] = (strip.gammaCorrectBri) ? 2.8 : 1.0;
@@ -626,9 +624,6 @@ void serializeConfig() {
   if_live[F("maxbri")] = arlsForceMaxBri;
   if_live[F("no-gc")] = arlsDisableGammaCorrection;
   if_live[F("offset")] = arlsOffset;
-  if_live[F("corr")] = liveHSVCorrection;
-  if_live[F("hsvsat")] = liveHSVSaturation;
-  if_live[F("hsvval")] = liveHSVValue;
 
   JsonObject if_va = interfaces.createNestedObject("va");
   if_va[F("alexa")] = alexaEnabled;
