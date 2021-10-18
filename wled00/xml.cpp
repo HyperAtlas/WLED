@@ -60,9 +60,9 @@ void XML_response(AsyncWebServerRequest *request, char* dest)
   oappend(SET_F("</wv><ws>"));
   oappendi(colSec[3]);
   oappend(SET_F("</ws><ps>"));
-  oappendi((currentPreset < 1) ? 0:currentPreset);
+  oappendi(currentPreset);
   oappend(SET_F("</ps><cy>"));
-  oappendi(currentPlaylist > 0);
+  oappendi(currentPlaylist >= 0);
   oappend(SET_F("</cy><ds>"));
   oappend(serverDescription);
   if (realtimeMode)
@@ -198,7 +198,7 @@ void extractPin(JsonObject &obj, const char *key) {
   }
 }
 
-// oappens used pins by scanning JsonObject (1 level deep)
+// oappend used pins by scanning JsonObject (1 level deep)
 void fillUMPins(JsonObject &mods)
 {
   for (JsonPair kv : mods) {
@@ -365,14 +365,10 @@ void getSettingsJS(byte subPage, char* dest)
     oappend(SET_F("bLimits("));
     oappend(itoa(WLED_MAX_BUSSES,nS,10));  oappend(",");
     oappend(itoa(MAX_LEDS_PER_BUS,nS,10)); oappend(",");
-    oappend(itoa(MAX_LED_MEMORY,nS,10));
+    oappend(itoa(MAX_LED_MEMORY,nS,10)); oappend(",");
+    oappend(itoa(MAX_LEDS,nS,10));
     oappend(SET_F(");"));
 
-    oappend(SET_F("d.Sf.LC.max=")); //TODO Formula for max LEDs on ESP8266 depending on types. 500 DMA or 1500 UART (about 4kB mem usage)
-    oappendi(MAX_LEDS);
-    oappend(";");
-
-    sappend('v',SET_F("LC"),ledCount);
     sappend('c',SET_F("MS"),autoSegments);
 
     for (uint8_t s=0; s < busses.getNumBusses(); s++) {
@@ -384,12 +380,13 @@ void getSettingsJS(byte subPage, char* dest)
       char ls[4] = "LS"; ls[2] = 48+s; ls[3] = 0; //strip start LED
       char cv[4] = "CV"; cv[2] = 48+s; cv[3] = 0; //strip reverse
       char sl[4] = "SL"; sl[2] = 48+s; sl[3] = 0; //skip 1st LED
+      char rf[4] = "RF"; rf[2] = 48+s; rf[3] = 0; //off refresh
       oappend(SET_F("addLEDs(1);"));
       uint8_t pins[5];
       uint8_t nPins = bus->getPins(pins);
       for (uint8_t i = 0; i < nPins; i++) {
         lp[1] = 48+i;
-        if (pinManager.isPinOk(pins[i])) sappend('v',lp,pins[i]);
+        if (pinManager.isPinOk(pins[i]) || bus->getType()>=TYPE_NET_DDP_RGB) sappend('v',lp,pins[i]);
       }
       sappend('v',lc,bus->getLength());
       sappend('v',lt,bus->getType());
@@ -397,6 +394,7 @@ void getSettingsJS(byte subPage, char* dest)
       sappend('v',ls,bus->getStart());
       sappend('c',cv,bus->reversed);
       sappend('c',sl,bus->skippedLeds());
+      sappend('c',rf,bus->isOffRefreshRequired());
     }
     sappend('v',SET_F("MA"),strip.ablMilliampsMax);
     sappend('v',SET_F("LA"),strip.milliampsPerLed);
