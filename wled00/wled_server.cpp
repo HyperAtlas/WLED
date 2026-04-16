@@ -3,22 +3,23 @@
 #ifndef WLED_DISABLE_OTA
   #include "ota_update.h"  
 #endif
-#include "html_ui.h"
-#include "html_settings.h"
-#include "html_other.h"
-#include "js_iro.h"
+#ifdef WLED_ENABLE_HTML
+  #include "html_ui.h"
+  #include "html_settings.h"
+  #include "html_other.h"
+  #include "js_iro.h"
+  #include "html_cpal.h"
+  #include "html_edit.h"
+#endif
 #ifdef WLED_ENABLE_PIXART
   #include "html_pixart.h"
 #endif
 #ifdef WLED_ENABLE_PXMAGIC
   #include "html_pxmagic.h"
 #endif
-#ifndef WLED_DISABLE_PIXELFORGE
+#if !defined(WLED_DISABLE_PIXELFORGE) && defined(WLED_ENABLE_HTML)
   #include "html_pixelforge.h"
 #endif
-#include "html_cpal.h"
-#include "html_edit.h"
-
 
 // define flash strings once (saves flash memory)
 static const char s_redirecting[] PROGMEM = "Redirecting...";
@@ -72,7 +73,11 @@ static bool inLocalSubnet(const IPAddress &client) {
  */
 
 static void generateEtag(char *etag, uint16_t eTagSuffix) {
+  #ifdef WLED_ENABLE_HTML
   sprintf_P(etag, PSTR("%u-%02x-%04x"), WEB_BUILD_TIME, cacheInvalidate, eTagSuffix);
+  #else
+  sprintf_P(etag, PSTR("0-%02x-%04x"), cacheInvalidate, eTagSuffix);
+  #endif
 }
 
 static void setStaticContentCacheHeaders(AsyncWebServerResponse *response, int code, uint16_t eTagSuffix = 0) {
@@ -220,6 +225,7 @@ static void handleUpload(AsyncWebServerRequest *request, const String& filename,
   }
 }
 
+#ifdef WLED_ENABLE_HTML
 static const char _edit_htm[] PROGMEM = "/edit.htm";
 
 void createEditHandler() {
@@ -313,6 +319,7 @@ void createEditHandler() {
     request->send(400, FPSTR(CONTENT_TYPE_PLAIN), F("Invalid function"));
   });
 }
+#endif
 
 static bool captivePortal(AsyncWebServerRequest *request)
 {
@@ -337,6 +344,7 @@ void initServer()
   DefaultHeaders::Instance().addHeader(F("Access-Control-Allow-Methods"), "*");
   DefaultHeaders::Instance().addHeader(F("Access-Control-Allow-Headers"), "*");
 
+#ifdef WLED_ENABLE_HTML
 #ifdef WLED_ENABLE_WEBSOCKETS
   #ifndef WLED_DISABLE_2D 
   server.on(F("/liveview2D"), HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -391,6 +399,7 @@ void initServer()
   server.on(F("/settings"), HTTP_POST, [](AsyncWebServerRequest *request){
     serveSettings(request, true);
   });
+#endif
 
   const static char _json[] PROGMEM = "/json";
   server.on(FPSTR(_json), HTTP_GET, [](AsyncWebServerRequest *request){
@@ -472,6 +481,7 @@ void initServer()
   });
 #endif
 
+#ifdef WLED_ENABLE_HTML
   server.on(F("/teapot"), HTTP_GET, [](AsyncWebServerRequest *request){
     serveMessage(request, 418, F("418. I'm a teapot."), F("(Tangible Embedded Advanced Project Of Twinkling)"), 254);
   });
@@ -482,7 +492,9 @@ void initServer()
   );
 
   createEditHandler(); // initialize "/edit" handler, access is protected by "correctPIN"
+#endif
 
+#ifdef WLED_ENABLE_HTML
   static const char _update[] PROGMEM = "/update";
 #ifndef WLED_DISABLE_OTA
   //init ota page
@@ -543,8 +555,9 @@ void initServer()
   server.on(_update, HTTP_GET, notSupported);
   server.on(_update, HTTP_POST, notSupported, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool isFinal){});
 #endif
+#endif
 
-#if defined(ARDUINO_ARCH_ESP32) && !defined(WLED_DISABLE_OTA)
+#if defined(ARDUINO_ARCH_ESP32) && !defined(WLED_DISABLE_OTA) && defined(WLED_ENABLE_HTML)
   // ESP32 bootloader update endpoint
   server.on(F("/updatebootloader"), HTTP_POST, [](AsyncWebServerRequest *request){
     if (request->_tempObject) {
@@ -591,12 +604,13 @@ void initServer()
   });
 #endif
 
-#ifdef WLED_ENABLE_DMX
+#if defined(WLED_ENABLE_DMX) && defined(WLED_ENABLE_HTML)
   server.on(F("/dmxmap"), HTTP_GET, [](AsyncWebServerRequest *request){
     request->send_P(200, FPSTR(CONTENT_TYPE_HTML), PAGE_dmxmap, dmxProcessor);
   });
 #endif
 
+#ifdef WLED_ENABLE_HTML
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (captivePortal(request)) return;
     if (!showWelcomePage || request->hasArg(F("sliders"))) {
@@ -633,6 +647,7 @@ void initServer()
   server.on(_cpal_htm, HTTP_GET, [](AsyncWebServerRequest *request) {
     handleStaticContent(request, FPSTR(_cpal_htm), 200, FPSTR(CONTENT_TYPE_HTML), PAGE_cpal, PAGE_cpal_length);
   });
+#endif
 
 #ifdef WLED_ENABLE_WEBSOCKETS
   server.addHandler(&ws);
@@ -641,7 +656,9 @@ void initServer()
   //called when the url is not defined here, ajax-in; get-settings
   server.onNotFound([](AsyncWebServerRequest *request){
     DEBUG_PRINTF_P(PSTR("Not-Found HTTP call: %s\n"), request->url().c_str());
+    #ifdef WLED_ENABLE_HTML
     if (captivePortal(request)) return;
+    #endif
 
     //make API CORS compatible
     if (request->method() == HTTP_OPTIONS)
@@ -656,11 +673,16 @@ void initServer()
     #ifndef WLED_DISABLE_ALEXA
     if(espalexa.handleAlexaApiCall(request)) return;
     #endif
+    #ifdef WLED_ENABLE_HTML
     handleStaticContent(request, request->url(), 404, FPSTR(CONTENT_TYPE_HTML), PAGE_404, PAGE_404_length);
+    #else
+    request->send(404, FPSTR(CONTENT_TYPE_PLAIN), F("Not found"));
+    #endif
   });
 }
 
 
+#ifdef WLED_ENABLE_HTML
 void serveMessage(AsyncWebServerRequest* request, uint16_t code, const String& headl, const String& subl, byte optionT)
 {
   messageHead = headl;
@@ -669,6 +691,7 @@ void serveMessage(AsyncWebServerRequest* request, uint16_t code, const String& h
 
   request->send_P(code, FPSTR(CONTENT_TYPE_HTML), PAGE_msg, msgProcessor);
 }
+#endif
 
 
 void serveJsonError(AsyncWebServerRequest* request, uint16_t code, uint16_t error)
@@ -684,6 +707,7 @@ void serveJsonError(AsyncWebServerRequest* request, uint16_t code, uint16_t erro
 }
 
 
+#ifdef WLED_ENABLE_HTML
 void serveSettingsJS(AsyncWebServerRequest* request)
 {
   if (request->url().indexOf(FPSTR(_common_js)) > 0) {
@@ -837,3 +861,4 @@ void serveSettings(AsyncWebServerRequest* request, bool post) {
   }
   handleStaticContent(request, "", code, contentType, content, len);
 }
+#endif

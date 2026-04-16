@@ -251,6 +251,13 @@ if (isAlreadyBuilt("wled00/data") && process.argv[2] !== '--force' && process.ar
   return;
 }
 
+const skipHtml = process.argv.includes('--skip-html') || process.argv.includes('--no-html');
+
+if (skipHtml) {
+  console.info("Skipping HTML generation (--skip-html flag detected)");
+  return;
+}
+
 writeHtmlGzipped("wled00/data/index.htm", "wled00/html_ui.h", 'index');
 writeHtmlGzipped("wled00/data/pixart/pixart.htm", "wled00/html_pixart.h", 'pixart');
 writeHtmlGzipped("wled00/data/pxmagic/pxmagic.htm", "wled00/html_pxmagic.h", 'pxmagic');
