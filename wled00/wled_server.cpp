@@ -4,12 +4,13 @@
   #include "ota_update.h"  
 #endif
 #ifdef WLED_ENABLE_HTML
-  #include "html_ui.h"
-  #include "html_settings.h"
-  #include "html_other.h"
-  #include "js_iro.h"
-  #include "html_cpal.h"
-  #include "html_edit.h"
+#include "html_ui.h"
+#include "html_settings.h"
+#include "html_other.h"
+#include "js_iro.h"
+#include "html_cpal.h"
+#include "html_edit.h"
+#include "js_omggif.h"
 #endif
 #ifdef WLED_ENABLE_PIXART
   #include "html_pixart.h"
@@ -20,6 +21,10 @@
 #if !defined(WLED_DISABLE_PIXELFORGE) && defined(WLED_ENABLE_HTML)
   #include "html_pixelforge.h"
 #endif
+
+// forward declarations
+static void createEditHandler();
+
 
 // define flash strings once (saves flash memory)
 static const char s_redirecting[] PROGMEM = "Redirecting...";
@@ -39,7 +44,7 @@ static const char s_no_store[]       PROGMEM = "no-store";
 static const char s_expires[]        PROGMEM = "Expires";
 static const char _common_js[]       PROGMEM = "/common.js";
 static const char _iro_js[]          PROGMEM = "/iro.js";
-
+static const char _omggif_js[]       PROGMEM = "/omggif.js";
 
 //Is this an IP?
 static bool isIp(const String &str) {
@@ -222,13 +227,14 @@ static void handleUpload(AsyncWebServerRequest *request, const String& filename,
       request->send(200, FPSTR(CONTENT_TYPE_PLAIN), F("File Uploaded!"));
     }
     cacheInvalidate++;
+    updateFSInfo(); // refresh memory usage info
   }
 }
 
 #ifdef WLED_ENABLE_HTML
 static const char _edit_htm[] PROGMEM = "/edit.htm";
 
-void createEditHandler() {
+static void createEditHandler() {
   if (editHandler != nullptr) server.removeHandler(editHandler);
 
   editHandler = &server.on(F("/edit"), static_cast<WebRequestMethod>(HTTP_GET), [](AsyncWebServerRequest *request) {
@@ -312,6 +318,7 @@ void createEditHandler() {
         request->send(500, FPSTR(CONTENT_TYPE_PLAIN), F("Delete failed"));
       else
         request->send(200, FPSTR(CONTENT_TYPE_PLAIN), F("File deleted"));
+      updateFSInfo(); // refresh memory usage info
       return;
     }
 
@@ -362,6 +369,10 @@ void initServer()
 
   server.on(_iro_js, HTTP_GET, [](AsyncWebServerRequest *request) {
     handleStaticContent(request, FPSTR(_iro_js), 200, FPSTR(CONTENT_TYPE_JAVASCRIPT), JS_iro, JS_iro_length);
+  });
+
+  server.on(_omggif_js, HTTP_GET, [](AsyncWebServerRequest *request) {
+    handleStaticContent(request, FPSTR(_omggif_js), 200, FPSTR(CONTENT_TYPE_JAVASCRIPT), JS_omggif, JS_omggif_length);
   });
 
   //settings page
@@ -640,6 +651,14 @@ void initServer()
   server.on(_pixelforge_htm, HTTP_GET, [](AsyncWebServerRequest *request) {
     handleStaticContent(request, FPSTR(_pixelforge_htm), 200, FPSTR(CONTENT_TYPE_HTML), PAGE_pixelforge, PAGE_pixelforge_length);
   });
+  #else
+  server.on("/pixelforge.htm", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/html",
+      F("<!DOCTYPE html><html><head><title>PixelForge</title></head>"
+      "<style>body{background:#000;color:#fff;font-family:sans-serif;display:flex;justify-content:center;}</style>"
+      "<body><h2>Sorry, PixelForge is not supported in this build.</h2></body></html>")
+    );
+  });
   #endif
 #endif
 
@@ -715,7 +734,7 @@ void serveSettingsJS(AsyncWebServerRequest* request)
     return;
   }
   byte subPage = request->arg(F("p")).toInt();
-  if (subPage > 10) {
+  if (subPage > SUBPAGE_LAST) {
     request->send_P(501, FPSTR(CONTENT_TYPE_JAVASCRIPT), PSTR("alert('Settings for this request are not implemented.');"));
     return;
   }
@@ -755,6 +774,7 @@ void serveSettings(AsyncWebServerRequest* request, bool post) {
 #ifndef WLED_DISABLE_2D
     else if (url.indexOf(  "2D")    > 0) subPage = SUBPAGE_2D;
 #endif
+    else if (url.indexOf(F("pins")) > 0) subPage = SUBPAGE_PINS;
     else if (url.indexOf(F("lock")) > 0) subPage = SUBPAGE_LOCK;
   }
   else if (url.indexOf("/update") >= 0) subPage = SUBPAGE_UPDATE; // update page, for PIN check
@@ -848,6 +868,7 @@ void serveSettings(AsyncWebServerRequest* request, bool post) {
 #ifndef WLED_DISABLE_2D
     case SUBPAGE_2D      :  content = PAGE_settings_2D;   len = PAGE_settings_2D_length;   break;
 #endif
+    case SUBPAGE_PINS    :  content = PAGE_settings_pininfo; len = PAGE_settings_pininfo_length; break;
     case SUBPAGE_LOCK    : {
       correctPIN = !strlen(settingsPIN); // lock if a pin is set
       serveMessage(request, 200, strlen(settingsPIN) > 0 ? PSTR("Settings locked") : PSTR("No PIN set"), FPSTR(s_redirecting), 1);
