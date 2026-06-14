@@ -813,6 +813,7 @@ BusHub75Matrix::BusHub75Matrix(const BusConfig &bc) : Bus(bc.type, bc.start, bc.
 
   // mxconfig.driver = HUB75_I2S_CFG::ICN2038S;  // experimental - use specific shift register driver
   // mxconfig.driver = HUB75_I2S_CFG::FM6124;    // try this driver in case you panel stays dark, or when colors look too pastel
+  // Other possible shiftreg drivers: HUB75_I2S_CFG::FM6126A, HUB75_I2S_CFG::ICN2038S, HUB75_I2S_CFG::MBI5124, HUB75_I2S_CFG::DP3246
 
   // mxconfig.latch_blanking = 3;
   // mxconfig.i2sspeed = HUB75_I2S_CFG::HZ_10M;  // experimental - 5MHZ should be enugh, but colours looks slightly better at 10MHz
@@ -824,8 +825,13 @@ BusHub75Matrix::BusHub75Matrix(const BusConfig &bc) : Bus(bc.type, bc.start, bc.
   mxconfig.chain_length = max((uint8_t) 1, min(chainLength, (uint8_t) 4));
 
   if (mxconfig.mx_height >= 64 && (mxconfig.chain_length > 1)) {
-    DEBUGBUS_PRINTLN(F("WARNING, only single panel can be used of 64 pixel boards due to memory"));
-    mxconfig.chain_length = 1;
+  #if defined(BOARD_HAS_PSRAM)                    // limitation to one panel only applies to boards without PSRAM
+    if (!psramFound() || ESP.getPsramSize() == 0) // PSRAM sanity check
+  #endif
+    {
+      DEBUGBUS_PRINTLN(F("WARNING, only single panel can be used of 64 pixel boards due to memory"));
+      mxconfig.chain_length = 1;
+    }
   }
 
   if (bc.type == TYPE_HUB75MATRIX_HS) {
@@ -835,6 +841,7 @@ BusHub75Matrix::BusHub75Matrix(const BusConfig &bc) : Bus(bc.type, bc.start, bc.
       _isVirtual = true;
       mxconfig.mx_width = min((uint8_t) 64, panelWidth) * 2;
       mxconfig.mx_height = min((uint8_t) 64, panelHeight) / 2;
+      mxconfig.driver = HUB75_I2S_CFG::FM6124;  // use FM6124 for "outdoor" 4-scan panels - workaround until we can make the driver user-configurable
   } else {
     DEBUGBUS_PRINTLN("Unknown type");
     return;
@@ -858,6 +865,14 @@ BusHub75Matrix::BusHub75Matrix(const BusConfig &bc) : Bus(bc.type, bc.start, bc.
   DEBUGBUS_PRINTLN("MatrixPanel_I2S_DMA - Matrix Portal S3 config");
   mxconfig.gpio = { 42, 41, 40, 38, 39, 37,  45, 36, 48, 35, 21, 47, 14, 2 };
 
+#elif defined(HD_WF2_PINOUT) // Huidu HD-WF2 ESP32-S3 (no PSRAM)
+
+  // https://www.aliexpress.com/item/1005002258734810.html
+  // https://github.com/mrcodetastic/ESP32-HUB75-MatrixPanel-DMA/issues/433
+  DEBUGBUS_PRINTLN("MatrixPanel_I2S_DMA - HD-WF2 S3 config");
+  // HUB75_I2S_CFG::i2s_pins _pins={R1_PIN, G1_PIN, B1_PIN, R2_PIN, G2_PIN, B2_PIN, A_PIN, B_PIN, C_PIN, D_PIN, E_PIN, LAT_PIN, OE_PIN, CLK_PIN};
+  mxconfig.gpio = { 2, 6, 10, 3, 7, 11, 39, 38, 37, 36, 21, 33, 35, 34 };
+
 #elif defined(CONFIG_IDF_TARGET_ESP32S3) && defined(BOARD_HAS_PSRAM)// ESP32-S3 with PSRAM
 
 #if defined(MOONHUB_S3_PINOUT)
@@ -866,6 +881,12 @@ BusHub75Matrix::BusHub75Matrix(const BusConfig &bc) : Bus(bc.type, bc.start, bc.
   // HUB75_I2S_CFG::i2s_pins _pins={R1_PIN, G1_PIN, B1_PIN, R2_PIN, G2_PIN, B2_PIN, A_PIN, B_PIN, C_PIN, D_PIN, E_PIN, LAT_PIN, OE_PIN, CLK_PIN};
   mxconfig.gpio = { 1, 5, 6, 7, 13, 9, 16, 48, 47, 21, 38, 8, 4, 18 };
 
+#elif defined(WAVESHARE_S3_PINOUT)
+  DEBUGBUS_PRINTLN("MatrixPanel_I2S_DMA - Waveshare S3 with PSRAM, Waveshare pinout");
+
+  // HUB75_I2S_CFG::i2s_pins _pins={R1_PIN, G1_PIN, B1_PIN, R2_PIN, G2_PIN, B2_PIN, A_PIN, B_PIN, C_PIN, D_PIN, E_PIN, LAT_PIN, OE_PIN, CLK_PIN};
+  mxconfig.gpio = {4, 5, 6, 7, 15, 16, 18, 8, 3, 42, 9, 40, 2, 41};
+  
 #else
   DEBUGBUS_PRINTLN("MatrixPanel_I2S_DMA - S3 with PSRAM");
   // HUB75_I2S_CFG::i2s_pins _pins={R1_PIN, G1_PIN, B1_PIN, R2_PIN, G2_PIN, B2_PIN, A_PIN, B_PIN, C_PIN, D_PIN, E_PIN, LAT_PIN, OE_PIN, CLK_PIN};
@@ -982,10 +1003,8 @@ BusHub75Matrix::BusHub75Matrix(const BusConfig &bc) : Bus(bc.type, bc.start, bc.
     }
     setBitArray(_ledsDirty, _len, false);             // reset dirty bits
 
-    if (mxconfig.double_buff == false) {
-      // create LEDs buffer (initialized to BLACK), prefer DRAM if enough heap is available (faster in case global _pixels buffer is in PSRAM as not both will fit the cache)
-      _ledBuffer = static_cast<CRGB*>(allocate_buffer(_len * sizeof(CRGB), BFRALLOC_PREFER_DRAM | BFRALLOC_CLEAR));
-    }
+    // create LEDs buffer (initialized to BLACK), prefer DRAM if enough heap is available (faster in case global _pixels buffer is in PSRAM as not both will fit the cache)
+    _ledBuffer = static_cast<CRGB*>(allocate_buffer(_len * sizeof(CRGB), BFRALLOC_PREFER_DRAM | BFRALLOC_CLEAR));
   }
 
   PANEL_CHAIN_TYPE chainType = CHAIN_NONE; // default for quarter-scan panels that do not use chaining
@@ -1078,6 +1097,7 @@ uint32_t BusHub75Matrix::getPixelColor(unsigned pix) const {
 
 void BusHub75Matrix::setBrightness(uint8_t b) {
   _bri = b;
+  if (!_valid || !display) return;
   display->setBrightness(_bri); 
 }
 
