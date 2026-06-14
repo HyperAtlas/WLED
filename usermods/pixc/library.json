@@ -1,0 +1,4 @@
+{
+  "name": "pixc",
+  "build": { "libArchive": false }
+}
