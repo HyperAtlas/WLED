@@ -1,0 +1,6 @@
+{
+  "name": "pixc_connect_blink",
+  "build": {
+    "libArchive": false
+  }
+}

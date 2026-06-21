@@ -849,18 +849,16 @@ void WLED::initInterfaces()
   if (aOtaEnabled) ArduinoOTA.begin();
 #endif
 
-  // Set up mDNS responder:
-  if (strlen(cmDNS) > 0) {
-    // "end" must be called before "begin" is called a 2nd time
-    // see https://github.com/esp8266/Arduino/issues/7213
-    MDNS.end();
-    MDNS.begin(cmDNS);
-
-    DEBUG_PRINTLN(F("mDNS started"));
-    MDNS.addService("http", "tcp", 80);
-    MDNS.addService("wled", "tcp", 80);
-    MDNS.addServiceTxt("wled", "tcp", "mac", escapedMac.c_str());
-  }
+  // mDNS responder DISABLED for PixC — the app discovers devices by scanning
+  // for the PixC-AP Wi-Fi SSID (initial pairing) and via the cloud once
+  // provisioned, so no mDNS advertisement is needed.
+  // if (strlen(cmDNS) > 0) {
+  //   MDNS.end();
+  //   MDNS.begin(cmDNS);
+  //   MDNS.addService("http", "tcp", 80);
+  //   MDNS.addService("wled", "tcp", 80);
+  //   MDNS.addServiceTxt("wled", "tcp", "mac", escapedMac.c_str());
+  // }
   server.begin();
 
   if (udpPort > 0 && udpPort != ntpLocalPort) {
